@@ -1,6 +1,10 @@
 # Path-based routing solution in Azure Container Apps with NGINX
 
-Azure Container Apps is a fully managed serverless container service that enables you to deploy and run containerized applications without having to manage the infrastructure. In this tutorial, you'll learn how to use Azure Container Apps to configure path-based routing for a set of containerized applications using NGINX as a reverse proxy.
+Azure Container Apps is a fully managed serverless container service that enables you to deploy and run containerized applications without having to manage the infrastructure.
+
+By default, HTTP apps in Azure Container Apps are accessible via a public URL that is unique to the app. However, you can use a reverse proxy like NGINX to route traffic to multiple apps based on the path or hostname.
+
+In this tutorial, you'll learn how to use Azure Container Apps to configure path-based routing for a set of containerized applications using NGINX as a reverse proxy.
 
 ```mermaid
 graph LR
@@ -191,3 +195,43 @@ az containerapp revision restart --name nginx --resource-group $RESOURCE_GROUP_N
   --revision $(az containerapp revision list -n nginx -g $RESOURCE_GROUP_NAME --query '[0].name' -o tsv)
 ```
 
+## Routing based on hostname
+
+You can also configure NGINX to route traffic based on the hostname. To do this, use multiple server blocks in the NGINX configuration file, each with a different `server_name` directive.
+
+```nginx
+events {
+}
+
+http {
+    server_names_hash_bucket_size 128;
+
+    server {
+        listen 80;
+        server_name nginx.proudgrass-abcdefgh.northeurope.azurecontainerapps.io;
+
+        location /app1/ {
+            proxy_http_version 1.1;
+            proxy_pass http://app1/;
+        }
+        location /app2/ {
+            proxy_http_version 1.1;
+            proxy_pass http://app2/;
+        }
+    }
+    
+    server {
+        listen 80;
+        server_name path-based-routing.anthonychu.dev;
+        
+        location /app3/ {
+            proxy_http_version 1.1;
+            proxy_pass http://app3/;
+        }
+    }
+}
+```
+
+In the above example, traffic to `nginx.proudgrass-abcdefgh.northeurope.azurecontainerapps.io` is routed to `app1` and `app2`, while traffic to `path-based-routing.anthonychu.dev` is routed to `app3`.
+
+Note the `server_names_hash_bucket_size 128;` directive. This is sometimes required when using a large number of server names, or in this case, when using a long domain name like the default one provided by Azure Container Apps.
